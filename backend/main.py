@@ -1,87 +1,143 @@
-# main.py
-
 import os
-import shutil
-from fastapi import FastAPI, UploadFile, File, HTTPException
+import uuid
+import traceback
+from typing import Optional, Dict, Any
+
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-# Import the new processing function and the agent setup
-import ml_logic
+from ml_logic import DocumentSession
 
-# --- App Initialization & CORS Configuration ---
+# -------------------------------------------------
+# App init
+# -------------------------------------------------
 app = FastAPI(
-    title="LeBy - Legal AI Assistant API",
-    version="1.0.0"
+    title="LeBy Intelligent Text Processor API",
+    version="4.0.0",
+    description="Text-first API for legal document analysis: summarize + chat (RAG).",
 )
 
-origins = ["http://localhost:3000"]
+# CORS
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[FRONTEND_ORIGIN, "http://127.0.0.1:3000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- Pydantic Models ---
+# In-memory session registry (ok for dev/demo)
+sessions: Dict[str, Dict[str, Any]] = {}
+
+
+# -------------------------------------------------
+# Models
+# -------------------------------------------------
+class StartFromTextRequest(BaseModel):
+    text: str = Field(..., min_length=100, description="Raw text to analyze")
+    filename: str = Field(..., description="Display name for the source")
+
+
+class StartSessionResponse(BaseModel):
+    session_id: str
+    filename: str
+
+
+class SessionStatusResponse(BaseModel):
+    session_id: str
+    status: str
+    filename: str
+    summary: Optional[str] = None
+
+
 class QueryRequest(BaseModel):
-    text: str
+    session_id: str
+    query: str
+
 
 class AgentResponse(BaseModel):
     response: str
 
-class UploadSuccessResponse(BaseModel):
-    filename: str
-    summary: str
 
-# --- Initialize Agent ---
-agent = ml_logic.setup_agent()
-
-# --- API Endpoints ---
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the LeBy Legal AI Assistant API!"}
-
-# In main.py
-
-@app.post("/upload-pdf/", response_model=UploadSuccessResponse)
-async def upload_pdf(file: UploadFile = File(...)):
-    """
-    Handles PDF uploads. It processes the document, generates an initial summary,
-    and prepares the backend for Q&A. The summary is returned to the frontend.
-    """
-    temp_dir = "temp_files"
-    os.makedirs(temp_dir, exist_ok=True)
-    file_path = os.path.join(temp_dir, file.filename)
-
-    # CHANGE: Re-added the try...finally block to ensure cleanup
+# -------------------------------------------------
+# Helpers
+# -------------------------------------------------
+def _process_text_background(text: str, session_id: str, filename: str) -> None:
+    """Build vector store + initial summary, then mark session READY."""
+    print(f"[{session_id}] Background processing started for {filename}")
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        initial_summary = ml_logic.process_uploaded_pdf(file_path)
+        doc_session = DocumentSession(full_text=text, session_id=session_id)
+        summary = doc_session.get_initial_summary()
 
-        return {"filename": file.filename, "summary": initial_summary}
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
-    
-"""  finally:
-        #This block will now run and delete the file after the request is complete
-        if os.path.exists(file_path):
-            os.remove(file_path) """
-            
+        sessions[session_id].update(
+            {
+                "session_object": doc_session,
+                "summary": summary,
+                "status": "READY",
+            }
+        )
+        print(f"[{session_id}] Processing complete. Session READY.")
+    except Exception:
+        traceback.print_exc()
+        # mark session as error but keep filename
+        sessions[session_id]["status"] = "ERROR"
 
-@app.post("/agent-query/", response_model=AgentResponse)
-async def agent_query(query: QueryRequest):
-    """Handles user queries by passing them to the AI agent."""
-    if not query.text:
-        raise HTTPException(status_code=400, detail="Query text cannot be empty.")
-    
+
+# -------------------------------------------------
+# Routes
+# -------------------------------------------------
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
+@app.post("/session/start-from-text", response_model=StartSessionResponse)
+async def start_session_from_text(
+    request: StartFromTextRequest, background_tasks: BackgroundTasks
+):
+    # create session skeleton
+    session_id = str(uuid.uuid4())
+    sessions[session_id] = {
+        "status": "PROCESSING",
+        "filename": request.filename,
+        "summary": None,
+        "session_object": None,
+    }
+
+    # do heavy lifting off-thread
+    background_tasks.add_task(
+        _process_text_background, request.text, session_id, request.filename
+    )
+    return {"session_id": session_id, "filename": request.filename}
+
+
+@app.get("/session/status/{session_id}", response_model=SessionStatusResponse)
+async def get_session_status(session_id: str):
+    session = sessions.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    return {
+        "session_id": session_id,
+        "status": session["status"],
+        "filename": session["filename"],
+        "summary": session.get("summary"),
+    }
+
+
+@app.post("/session/query", response_model=AgentResponse)
+async def query_session(request: QueryRequest):
+    session = sessions.get(request.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    if session.get("status") != "READY" or not session.get("session_object"):
+        raise HTTPException(status_code=400, detail="Session not ready.")
+
     try:
-        agent_response = agent.run(query.text)
-        return {"response": agent_response}
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent failed to process the query: {e}")
+        doc_session: DocumentSession = session["session_object"]
+        answer = doc_session.answer_query(request.query)
+        return {"response": answer}
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Agent encountered an error.")

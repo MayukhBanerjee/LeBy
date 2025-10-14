@@ -23,6 +23,7 @@ import SendIcon from "@mui/icons-material/Send";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import ArticleIcon from "@mui/icons-material/Article";
 import GavelIcon from "@mui/icons-material/Gavel";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import "./App.css";
 
 // Configure PDF.js worker via CDN matching installed version
@@ -31,6 +32,14 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 // --- API BASE URL ---
 const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+
+// --- Seed text for a "general legal help" session (>=100 chars to satisfy backend) ---
+const GENERIC_SESSION_TEXT = `
+GENERAL LEGAL HELP SESSION (no attached document).
+The user wants practical next steps, suggested contacts, and risk checks for common legal situations
+(e.g., accidents, police interactions, consumer issues, workplace disputes, or landlord-tenant problems).
+Focus on clear actions, who to contact, and what evidence to prepare. Avoid legalese; be concise.
+`;
 
 // --- Helper: Extract text from PDF ---
 async function extractPdfText(file) {
@@ -49,25 +58,11 @@ async function extractPdfText(file) {
 function formatAiTextToHtml(raw) {
   if (!raw) return "";
   let html = raw;
-
-  // Normalize Windows newlines
   html = html.replace(/\r\n/g, "\n");
-
-  // Convert markdown bold **text** to <strong>
   html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-
-  // Convert list-style lines beginning with "* " into indented bullets
-  // Handles lines that start with "* " or newline + "* "
-  html = html.replace(/(^|\n)\*\s+(.*)/g, (_, p1, p2) => {
-    return `${p1}&nbsp;&nbsp;&nbsp;&nbsp;• ${p2}`;
-  });
-
-  // Italics for single-asterisk wrapped words that are not list bullets
+  html = html.replace(/(^|\n)\*\s+(.*)/g, (_, p1, p2) => `${p1}&nbsp;&nbsp;&nbsp;&nbsp;• ${p2}`);
   html = html.replace(/\*(?!\s|\*)([^*\n]+)\*/g, "<em>$1</em>");
-
-  // Convert remaining newlines to <br>
   html = html.replace(/\n/g, "<br/>");
-
   return html;
 }
 
@@ -111,8 +106,14 @@ export default function App() {
   const [inputValue, setInputValue] = useState("");
   const [pastedText, setPastedText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
   const [sessionId, setSessionId] = useState(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState(null);
+
   const [currentFile, setCurrentFile] = useState("");
+  const [generalMode, setGeneralMode] = useState(false); // NEW: track General Help mode
+
   const [notification, setNotification] = useState({
     open: false,
     message: "",
@@ -135,48 +136,111 @@ export default function App() {
     };
   }, []);
 
-  // --- Utility: Toast ---
   const showToast = (message, severity = "info") =>
     setNotification({ open: true, message, severity });
 
   // --- Poll backend until READY ---
-  const pollStatus = (sid, filename) => {
+  const pollStatus = (sid, filename, silent = false) => {
+    if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
         const { data } = await axios.get(`${API_BASE_URL}/session/status/${sid}`);
         if (data.status === "READY") {
           clearInterval(pollRef.current);
-          setMessages([
-            {
-              sender: "ai",
-              text:
-                `✅ Analysis of "${filename}" complete!\n\n` +
-                `--- Summary ---\n${data.summary}\n\n` +
-                `Now you can ask me questions like “What should I do next?”, “Who can help?”, or “Explain Section 4.”`
-            }
-          ]);
-          setAppState("chat");
+          setSessionReady(true);
+
+          if (silent && generalMode) {
+            // General Help: keep the greeting visible; do NOT append auto-summary
+          } else if (appState === "chat" && silent) {
+            // Silent but not General Help: append a soft summary
+            setMessages((m) => [
+              ...m,
+              {
+                sender: "ai",
+                text:
+                  `✅ Context ready for **${filename}**.\n\n` +
+                  `--- Summary ---\n${data.summary}\n\n` +
+                  `You can ask follow-ups like “What should I do next?” or “Who can help?”`
+              }
+            ]);
+          } else {
+            // Normal flow (PDF/Pasted): show full summary
+            setMessages([
+              {
+                sender: "ai",
+                text:
+                  `✅ Analysis of "${filename}" complete!\n\n` +
+                  `--- Summary ---\n${data.summary}\n\n` +
+                  `Now you can ask me questions like “What should I do next?”, “Who can help?”, or “Explain Section 4.”`
+              }
+            ]);
+            setAppState("chat");
+          }
+
+          // Auto-send any queued question
+          if (pendingQuestion) {
+            const q = pendingQuestion;
+            setPendingQuestion(null);
+            await sendQuestion(q, sid);
+          }
         } else if (data.status === "ERROR") {
           clearInterval(pollRef.current);
+          setSessionReady(false);
+          if (!silent || !generalMode) setAppState("input");
           showToast("Processing failed. Please try again.", "error");
-          setAppState("input");
         }
       } catch {
         clearInterval(pollRef.current);
+        setSessionReady(false);
+        if (!silent || !generalMode) setAppState("input");
         showToast("Could not get session status.", "error");
-        setAppState("input");
       }
-    }, 2500);
+    }, 1800);
   };
 
-  // --- Start New Session from Text ---
+  // --- Core: POST a question to backend ---
+  const sendQuestion = async (question, sid = sessionId) => {
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/session/query`, {
+        session_id: sid,
+        query: question
+      });
+      setMessages((m) => [...m, { sender: "ai", text: data.response }]);
+    } catch (err) {
+      const detail = err?.response?.data?.detail || "";
+      if (detail.includes("Session not ready") || err?.response?.status === 400) {
+        setPendingQuestion(question);
+        const alreadyPending = messages[messages.length - 1]?.meta === "pending";
+        if (!alreadyPending) {
+          setMessages((m) => [
+            ...m,
+            {
+              sender: "ai",
+              text:
+                "Setting things up in the background… I’ll answer as soon as I’m ready.",
+              meta: "pending"
+            }
+          ]);
+        }
+        return;
+      }
+      const msg =
+        detail ||
+        "Sorry, something went wrong while processing your question.";
+      setMessages((m) => [...m, { sender: "ai", text: msg }]);
+    }
+  };
+
+  // --- Start New Session from Text (with processing screen) ---
   const startSession = async (text, filename) => {
+    setGeneralMode(false); // ensure we’re not in general mode
     if (!text || text.trim().length < 100) {
       showToast("Please provide at least 100 characters of text.", "warning");
       return;
     }
     setAppState("processing");
     setCurrentFile(filename);
+    setSessionReady(false);
     try {
       const { data } = await axios.post(`${API_BASE_URL}/session/start-from-text`, {
         text,
@@ -190,6 +254,39 @@ export default function App() {
         "Failed to start session. Is the backend running?";
       showToast(msg, "error");
       setAppState("input");
+    }
+  };
+
+  // --- Start General Help (no processing screen; start silently) ---
+  const startGeneralSession = async () => {
+    setGeneralMode(true);
+    setAppState("chat");
+    setCurrentFile("General Legal Help");
+    setSessionReady(false);
+    setMessages([
+      {
+        sender: "ai",
+        text:
+          "**General Legal Help**\n\n" +
+          "* Tell me what happened (who, what, where, when).\n" +
+          "* Share any notices, dates, amounts, or deadlines.\n" +
+          "* I’ll give immediate next steps, what to prepare, and who to contact."
+      }
+    ]);
+
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/session/start-from-text`, {
+        text: GENERIC_SESSION_TEXT,
+        filename: "General Legal Help"
+      });
+      setSessionId(data.session_id);
+      // Poll silently; in general mode we do NOT append the summary
+      pollStatus(data.session_id, data.filename, /*silent*/ true);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ??
+        "Could not initialize the assistant. Please try again.";
+      setMessages((m) => [...m, { sender: "ai", text: msg }]);
     }
   };
 
@@ -215,20 +312,8 @@ export default function App() {
     setInputValue("");
     setMessages((m) => [...m, { sender: "user", text: question }]);
     setIsLoading(true);
-    try {
-      const { data } = await axios.post(`${API_BASE_URL}/session/query`, {
-        session_id: sessionId,
-        query: question
-      });
-      setMessages((m) => [...m, { sender: "ai", text: data.response }]);
-    } catch (err) {
-      const msg =
-        err?.response?.data?.detail ??
-        "Sorry, something went wrong while processing your question.";
-      setMessages((m) => [...m, { sender: "ai", text: msg }]);
-    } finally {
-      setIsLoading(false);
-    }
+    await sendQuestion(question);
+    setIsLoading(false);
   };
 
   // --- Render: Input Screen ---
@@ -242,15 +327,18 @@ export default function App() {
         gap: 3
       }}
     >
-      <Typography variant="h6" color="text.secondary">
-        Start by providing a document
+      <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+        Start by providing a document or ask the assistant directly
       </Typography>
+
       <Box sx={{ display: "flex", gap: 3, width: "100%", flexWrap: "wrap" }}>
         {/* Upload PDF */}
-        <Card sx={{ flex: 1, minWidth: 320, textAlign: "center" }}>
+        <Card sx={{ flex: 1, minWidth: 280, textAlign: "center" }}>
           <CardContent>
-            <UploadFileIcon sx={{ fontSize: 48, color: "primary.main" }} />
-            <Typography sx={{ mt: 1.5 }}>Upload a PDF File</Typography>
+            <UploadFileIcon sx={{ fontSize: 44, color: "primary.main" }} />
+            <Typography sx={{ mt: 1.5, fontWeight: 600 }}>
+              Upload a PDF File
+            </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Text is extracted locally in your browser, then analyzed securely.
             </Typography>
@@ -268,12 +356,12 @@ export default function App() {
         </Card>
 
         {/* Paste Text */}
-        <Card sx={{ flex: 1, minWidth: 320 }}>
+        <Card sx={{ flex: 1, minWidth: 280 }}>
           <CardContent sx={{ display: "flex", flexDirection: "column" }}>
             <ArticleIcon
-              sx={{ fontSize: 48, color: "primary.main", alignSelf: "center" }}
+              sx={{ fontSize: 44, color: "primary.main", alignSelf: "center" }}
             />
-            <Typography sx={{ mt: 1.5, textAlign: "center" }}>
+            <Typography sx={{ mt: 1.5, textAlign: "center", fontWeight: 600 }}>
               Paste Document Text
             </Typography>
             <TextareaAutosize
@@ -302,6 +390,22 @@ export default function App() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* NEW: General Legal Help */}
+        <Card sx={{ flex: 1, minWidth: 280, textAlign: "center" }}>
+          <CardContent>
+            <HelpOutlineIcon sx={{ fontSize: 44, color: "primary.main" }} />
+            <Typography sx={{ mt: 1.5, fontWeight: 600 }}>
+              General Legal Help
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              No document? Ask about incidents, accidents, police, tenancy, work disputes, etc.
+            </Typography>
+            <Button variant="outlined" onClick={startGeneralSession}>
+              Start Chat
+            </Button>
+          </CardContent>
+        </Card>
       </Box>
 
       <Stack direction="row" spacing={1}>
@@ -314,7 +418,7 @@ export default function App() {
   // --- Render: Processing Screen ---
   const ProcessingScreen = (
     <Box sx={{ p: 4, textAlign: "center" }}>
-      <Typography variant="h6">Analyzing “{currentFile}”…</Typography>
+      <Typography variant="h6">Preparing “{currentFile}”…</Typography>
       <Typography color="text.secondary" sx={{ my: 1.5 }}>
         This may take a moment for large documents.
       </Typography>
@@ -327,7 +431,12 @@ export default function App() {
     <>
       <Box sx={{ p: 1.5, borderBottom: "1px solid #e5e7eb" }}>
         <Typography variant="body2" color="text.secondary">
-          Session: <strong>{currentFile}</strong>
+          Session: <strong>{currentFile}</strong>{" "}
+          {!sessionReady && (
+            <em style={{ marginLeft: 8, color: "#64748b" }}>
+              (setting up context… you can still ask)
+            </em>
+          )}
         </Typography>
       </Box>
 
@@ -356,7 +465,6 @@ export default function App() {
                 whiteSpace: "normal"
               }}
             >
-              {/* Render user text as plain text with line breaks; AI text as formatted HTML */}
               {m.sender === "ai" ? (
                 <div
                   style={{ textAlign: "left", marginLeft: "4px" }}
@@ -384,7 +492,7 @@ export default function App() {
       >
         <TextField
           fullWidth
-          placeholder="Ask a question about the document..."
+          placeholder="Ask a question about the document or your situation..."
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           disabled={isLoading}
@@ -419,9 +527,12 @@ export default function App() {
               ? () => {
                   setAppState("input");
                   setSessionId(null);
+                  setSessionReady(false);
+                  setPendingQuestion(null);
                   setMessages([]);
                   setPastedText("");
                   setCurrentFile("");
+                  setGeneralMode(false); // reset
                 }
               : undefined
           }

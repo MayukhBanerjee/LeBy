@@ -1,6 +1,7 @@
 # Python virtual environment
 venv/
 __pycache__/
+vector_stores/
 *.pyc
 *.pyo
 *.pyd
@@ -22,3 +23,16 @@ __pycache__/
 # System / Misc
 .DS_Store
 Thumbs.db
+
+
+# Python
+backend/venv/
+backend/__pycache__/
+backend/vector_stores/
+backend/temp_files/
+backend/.env
+
+# Node
+frontend/node_modules/
+frontend/build/
+.DS_Store

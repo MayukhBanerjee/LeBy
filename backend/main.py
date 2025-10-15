@@ -12,6 +12,11 @@ from ml_logic import DocumentSession
 # -------------------------------------------------
 # App init
 # -------------------------------------------------
+api_key_loaded = os.getenv("GOOGLE_API_KEY") is not None
+print(f"--- STARTUP CHECK: GOOGLE_API_KEY Loaded: {api_key_loaded} ---")
+if not api_key_loaded:
+    print("--- WARNING: GOOGLE_API_KEY environment variable is NOT set! ---")
+    
 app = FastAPI(
     title="LeBy Intelligent Text Processor API",
     version="4.0.0",

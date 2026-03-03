@@ -1,205 +1,213 @@
-🧠 LeBy – Intelligent Legal Assistant
-An AI-powered legal assistant that combines Retrieval-Augmented Generation (RAG), semantic search, and structured response generation to provide document-grounded legal guidance and general legal help.
+# 🧠 LeBy – Intelligent Legal Assistant
 
-LeBy allows users to:
+LeBy is an AI-powered legal assistant that combines **Retrieval-Augmented Generation (RAG)**, semantic search, and structured response generation to provide document-grounded legal guidance and general legal help.
 
-Upload legal documents (PDF or text)
+It supports:
 
-Generate structured summaries
+- 📄 Legal document upload & analysis
+- 🔍 Context-aware question answering
+- 🧠 Retrieval-based reasoning (FAISS)
+- 💬 General legal assistance (non-RAG mode)
+- ✅ Structured, actionable legal outputs
 
-Ask contextual follow-up questions
+---
 
-Receive practical next-step legal guidance
+# 🚀 Features
 
-Use general legal chat without document context
+## 📄 Document Analysis Mode (RAG-Based)
 
-🚀 Features
-📄 Document Analysis Mode (RAG-Based)
-Upload PDF or paste legal text
+- Upload PDF or paste legal text
+- Automatic text extraction using PDF.js
+- Intelligent text chunking
+- Embedding generation
+- FAISS vector database storage
+- Semantic retrieval per query
+- Context-grounded LLM responses
+- Structured legal action plan outputs
 
-Automatic text extraction using pdfjs
+---
 
-Semantic chunking + embeddings
+## 💬 General Legal Help Mode (Agent-Based)
 
-FAISS vector database for retrieval
+- No document required
+- Direct LLM reasoning
+- Practical next-step guidance
+- Structured output (Actions, Risks, Clarifications)
+- Fully isolated from vector database
 
-Context-grounded LLM responses
+---
 
-Structured legal action plans
+# 🏗 System Architecture
 
-Risk & caveat identification
-
-💬 General Legal Help Mode (Non-RAG Agent)
-No document required
-
-Direct AI-powered legal reasoning
-
-Structured practical guidance
-
-Incident-based action planning
-
-Clear next steps and documentation checklist
-
-🏗 Architecture Overview
+```
 Frontend (React + MUI)
         ↓
 FastAPI Backend
         ↓
 Mode Router
   ├── Document Mode → RAG Pipeline (FAISS)
-  └── General Mode → Direct Agent
-🔍 RAG Pipeline (Document Mode)
-User uploads document
+  └── General Mode → Direct Agent (No Vector DB)
+```
 
-Backend extracts & chunks text
+---
 
-Embeddings generated
+# 🧠 AI Components
 
-Stored in FAISS vector DB
+- Gemini 2.x Chat Model
+- FAISS Vector Database
+- Retrieval-Augmented Generation
+- Structured Prompt Engineering
+- Adaptive Chunking Strategy
 
-On query:
+---
 
-Semantic retrieval
+# 🛠 Tech Stack
 
-Context injection
+## Frontend
+- React
+- Material UI
+- Axios
+- PDF.js
 
-Gemini LLM response
+## Backend
+- FastAPI
+- Uvicorn
+- FAISS
+- Google Generative AI (Gemini)
+- Python 3.10+
 
-Structured legal output
+---
 
-🤖 AI Components Used
-Gemini 2.x (Chat Model)
+# 📦 Installation & Setup
 
-FAISS (Vector Store)
+---
 
-Custom Prompt Engineering
+## 1️⃣ Clone Repository
 
-Adaptive Retrieval Chunking
-
-Structured Output Formatting
-
-🛠 Tech Stack
-Frontend
-React
-
-Material UI
-
-Axios
-
-PDF.js
-
-Backend
-FastAPI
-
-Uvicorn
-
-FAISS
-
-Google Generative AI (Gemini)
-
-Python 3.10+
-
-📦 Installation & Setup
-1️⃣ Clone Repository
+```bash
 git clone https://github.com/YOUR_USERNAME/leby.git
 cd leby
-2️⃣ Backend Setup
+```
+
+---
+
+## 2️⃣ Backend Setup
+
+```bash
 cd backend
 python -m venv venv
-source venv/bin/activate      # Mac/Linux
-venv\Scripts\activate         # Windows
-Install dependencies:
+```
 
+### Activate Virtual Environment
+
+Windows:
+```bash
+venv\Scripts\activate
+```
+
+Mac/Linux:
+```bash
+source venv/bin/activate
+```
+
+### Install Dependencies
+
+```bash
 pip install -r requirements.txt
-3️⃣ Environment Variables
-Create a .env file inside backend:
+```
 
+---
+
+## 3️⃣ Environment Variables
+
+Create a `.env` file inside the backend directory:
+
+```
 GOOGLE_API_KEY=your_gemini_api_key_here
-⚠ Do NOT commit this file.
+```
 
-4️⃣ Run Backend
+⚠️ Do NOT commit this file.
+
+---
+
+## 4️⃣ Run Backend Server
+
+```bash
 uvicorn main:app --reload --port 8000
-Server will start at:
+```
 
+Backend runs at:
+
+```
 http://localhost:8000
-5️⃣ Frontend Setup
-Open new terminal:
+```
 
+API Docs:
+
+```
+http://localhost:8000/docs
+```
+
+---
+
+## 5️⃣ Frontend Setup
+
+Open a new terminal:
+
+```bash
 cd frontend
 npm install
-If needed, create .env:
+```
 
+Optional `.env` inside frontend:
+
+```
 REACT_APP_API_BASE_URL=http://localhost:8000
+```
+
 Run frontend:
 
+```bash
 npm start
+```
+
 Frontend runs at:
 
+```
 http://localhost:3000
-🧠 How It Works Internally
-Document Mode
-Creates a session
+```
 
-Stores document embeddings in FAISS
+---
 
-All queries routed through /session/query
+# 🔍 How It Works
 
-Retrieval + LLM synthesis
+## 📄 Document Mode Flow
 
-Structured response formatting
+1. User uploads PDF or pastes text
+2. Backend extracts and chunks text
+3. Embeddings generated
+4. Stored in FAISS vector DB
+5. On user query:
+   - Relevant chunks retrieved
+   - Injected into prompt
+   - Gemini generates structured response
+6. Response returned to frontend
 
-General Mode
-No session creation
+---
 
-No vector database usage
+## 💬 General Mode Flow
 
-Queries routed to /general/query
+1. No document uploaded
+2. No embeddings created
+3. No FAISS usage
+4. Direct agent reasoning
+5. Structured legal output
 
-Direct agent reasoning
+---
 
-Clean separation from RAG
+# 📁 Project Structure
 
-🔐 Security & Best Practices
-API keys stored in .env
-
-No vector persistence in General Mode
-
-Session-isolated document embeddings
-
-Safe HTML rendering with sanitization
-
-Strict prompt formatting constraints
-
-📊 Example Use Cases
-FIR interpretation
-
-Rental agreement explanation
-
-Employment contract analysis
-
-Consumer complaint strategy
-
-Police interaction guidance
-
-Legal notice breakdown
-
-Accident next-step planning
-
-🧪 Testing
-Backend health check:
-
-GET /docs
-Test endpoints:
-
-POST /session/start-from-text
-
-GET /session/status/{session_id}
-
-POST /session/query
-
-POST /general/query
-
-📁 Project Structure
+```
 leby/
 │
 ├── backend/
@@ -211,59 +219,98 @@ leby/
 │   └── .env
 │
 ├── frontend/
-│   ├── src/App.js
+│   ├── src/
+│   │   ├── App.js
+│   │   └── ...
 │   ├── package.json
-│   └── ...
+│   └── .env
 │
 └── README.md
-📌 Design Philosophy
+```
+
+---
+
+# 🔐 Security & Design Decisions
+
+- API keys stored in `.env`
+- Session-based document isolation
+- Vector DB not used in General Mode
+- Safe HTML rendering
+- Structured prompt constraints
+- No automatic document persistence
+
+---
+
+# 📊 Example Use Cases
+
+- FIR interpretation
+- Rental agreement analysis
+- Employment contract review
+- Legal notice breakdown
+- Consumer dispute planning
+- Accident next-step guidance
+- Police interaction advice
+
+---
+
+# 🧪 Testing Endpoints
+
+| Endpoint | Purpose |
+|----------|----------|
+| `POST /session/start-from-text` | Create document session |
+| `GET /session/status/{session_id}` | Check processing status |
+| `POST /session/query` | Ask question (RAG mode) |
+| `POST /general/query` | Ask question (Agent mode) |
+
+---
+
+# 📌 Design Philosophy
+
 LeBy is built around:
 
-Clear mode isolation (RAG vs Agent)
+- Clear separation of RAG and Agent modes
+- Minimal hallucination through retrieval grounding
+- Structured legal output formatting
+- Practical, action-oriented responses
+- Clean system isolation
 
-Structured legal output
+---
 
-Actionable next steps
+# 🚀 Future Improvements
 
-Practical over verbose
+- Persistent vector storage
+- User authentication
+- Multi-document sessions
+- Cloud deployment
+- Case law database integration
+- Legal citation grounding
+- Fine-tuned domain models
 
-Minimal hallucination via retrieval grounding
+---
 
-🌍 Future Improvements
-Persistent vector storage
+# 👨‍💻 Author
 
-User authentication
-
-Multi-document sessions
-
-Deployment (Render / Railway / AWS)
-
-Case law database integration
-
-Legal citation grounding
-
-Role-based legal personas
-
-👨‍💻 Author
-Mayukh Banerjee
+**Mayukh Banerjee**
 
 AI Engineer | RAG Systems | Applied LLM Architect
 
-⭐ Why This Project Matters
-Legal AI tools often:
+---
 
-Hallucinate
+# ⭐ Why LeBy?
 
-Give vague advice
+Most legal AI tools:
 
-Lack structured action steps
+- Hallucinate
+- Provide vague guidance
+- Lack structured next steps
 
 LeBy solves this by combining:
 
-Retrieval grounding
+- Retrieval grounding
+- Structured response format
+- Practical action plans
+- Clean architecture separation
 
-Structured response format
+---
 
-Practical action-oriented outputs
-
-Clean separation of RAG & general reasoning
+If you found this project interesting, consider starring ⭐ the repository.

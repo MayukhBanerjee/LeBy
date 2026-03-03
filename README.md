@@ -48,7 +48,7 @@ Mode Router
   ├── Document Mode → RAG Pipeline (FAISS)
   └── General Mode → Direct Agent (No Vector DB)
 ```
-
+![System Architecture](SystemArchitecture.png)
 ---
 
 # 🧠 AI Components

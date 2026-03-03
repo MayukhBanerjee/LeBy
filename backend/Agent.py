@@ -170,7 +170,7 @@ class DocumentSession:
         Answer follow-up questions with strong, action-oriented guidance.
         - Always ground in retrieved context.
         - If the user asks something vague (“what should I do”), still propose next steps.
-        - If information is missing, give best-practice guidance first, then ask 2–3 clarifying questions.
+        - If information is missing, give best-practice guidance first, then ask 2 to 3 clarifying questions.
         - Keep it concise and direct.
         """
         # Retrieve top chunks for grounding
@@ -205,10 +205,10 @@ class DocumentSession:
             "POSSIBLE STRUCTURE (use adaptively):\n\n"
         
             "**Direct Answer**\n"
-            "Clear response in 1–2 sentences.\n\n"
+            "Clear response in 1 to 2 sentences.\n\n"
         
             "**Action Steps** (if action is needed)\n"
-            "* 2–5 practical steps.\n\n"
+            "* 2 to 5 practical steps.\n\n"
         
             "**Risks / Considerations** (if relevant)\n"
             "* Key legal or practical concerns.\n\n"

@@ -7,7 +7,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from ml_logic import DocumentSession
+from Agent import DocumentSession
 
 # -------------------------------------------------
 # App init

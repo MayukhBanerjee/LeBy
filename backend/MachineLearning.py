@@ -1,34 +1,3 @@
-"""
-legal_issue_classifier.py
----------------------------------
-A tiny, standalone ML playground module for your repo.
-
-What it does:
-- Builds a scikit-learn text classifier to label short legal situations
-  (Traffic/Accident, Police/Criminal, Landlord/Tenant, Employment, Consumer/Contract, Family)
-- Trains on a small in-memory dataset (no files needed)
-- Evaluates with a classification report + confusion matrix
-- Saves/loads the model artifact
-- Predicts labels for new texts (CLI + importable functions)
-
-Usage (from backend/):
-    # Train and evaluate, then save model
-    python -m ml_playground.legal_issue_classifier train
-
-    # Evaluate on the holdout set (loads artifact if available or retrains if not)
-    python -m ml_playground.legal_issue_classifier eval
-
-    # Predict a label for a snippet
-    python -m ml_playground.legal_issue_classifier predict "I rear-ended a car at a signal; insurance wants a statement."
-
-Integration:
-- This module is self-contained and **does not affect** your FastAPI or Gemini code.
-- You can import predict_text() elsewhere if you want optional hooks.
-
-Requirements (add to your backend env if needed):
-    pip install scikit-learn==1.4.2 joblib==1.3.2
-"""
-
 from __future__ import annotations
 import argparse
 import os

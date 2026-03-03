@@ -11,7 +11,7 @@ import google.generativeai as genai
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
-from langchain_core.embeddings import Embeddings  # interface for FAISS
+from langchain_core.embeddings import Embeddings
 
 
 # ---------------------------------------------------------------------
@@ -36,7 +36,7 @@ class GoogleSDKEmbeddings(Embeddings):
     Avoids storing huge arrays; each chunk is embedded individually.
     """
 
-    def __init__(self, model: str = "models/text-embedding-004"):
+    def __init__(self, model: str = "models/text-embedding-001"):
         self.model = model
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
@@ -74,7 +74,7 @@ def _pick_model() -> str:
     Try several Gemini chat model IDs and pick the first working one.
     This eliminates 'model not found' errors across API regions.
     """
-    candidates = ["gemini-2.0-flash"]
+    candidates = ["gemini-2.5-flash"]
     for model_name in candidates:
         try:
             mdl = genai.GenerativeModel(model_name)

@@ -36,7 +36,7 @@ class GoogleSDKEmbeddings(Embeddings):
     Avoids storing huge arrays; each chunk is embedded individually.
     """
 
-    def __init__(self, model: str = "models/text-embedding-001"):
+    def __init__(self, model: str = "models/gemini-embedding-001"):
         self.model = model
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
@@ -69,26 +69,8 @@ EMB = GoogleSDKEmbeddings()
 # ---------------------------------------------------------------------
 # 3. MODEL PICKER (ROBUST FALLBACK)
 # ---------------------------------------------------------------------
-def _pick_model() -> str:
-    """
-    Try several Gemini chat model IDs and pick the first working one.
-    This eliminates 'model not found' errors across API regions.
-    """
-    candidates = ["gemini-2.5-flash"]
-    for model_name in candidates:
-        try:
-            mdl = genai.GenerativeModel(model_name)
-            r = mdl.generate_content("healthcheck")
-            if hasattr(r, "text") or getattr(r, "candidates", None):
-                print(f"[LLM] Using Gemini model: {model_name}")
-                return model_name
-        except Exception as e:
-            print(f"[LLM] Probe failed for {model_name}: {e}")
-            continue
-    raise RuntimeError("❌ No compatible Gemini chat model found for this API key.")
 
-
-CHAT_MODEL = _pick_model()
+CHAT_MODEL = "gemini-2.5-flash"
 
 
 # ---------------------------------------------------------------------
@@ -208,29 +190,40 @@ class DocumentSession:
 
         # Concise, structured prompt
         prompt = (
-            "You are an intelligent, practical legal assistant.\n"
-            "USE the provided document context to answer. If the question is broad "
-            "(e.g., 'what should I do next?'), infer the most likely next steps from the context "
-            "and provide a concrete action plan.\n\n"
-            "STYLE & LENGTH CONSTRAINTS:\n"
-            "- Total length: UNDER 150 words.\n"
-            "- Be direct. No filler, no disclaimers.\n"
-            "- Use **bold** section labels and short bullets starting with '* '.\n"
-            "- If something is missing, infer from context and clearly state assumptions.\n\n"
-            "RESPONSE FORMAT (strict):\n"
-            "1) **Direct Answer / Next Steps** – 1–2 sentences max.\n"
-            "2) **Action Plan** – 3–5 bullets (who to contact, deadlines, documents to gather).\n"
-            "3) **Risks / Caveats** – up to 3 bullets (only if relevant).\n"
-            "4) **Clarify** – up to 3 short questions ONLY if critical.\n\n"
+              "You are a smart and practical legal assistant.\n\n"
+
+            "Always use the provided document context to answer the user's question.\n"
+            "If the question is broad (e.g., 'What should I do next?'), provide a clear action plan.\n"
+            "If the question is specific, answer directly and only add sections if helpful.\n\n"
+        
+            "RESPONSE GUIDELINES:\n"
+            "• Keep responses under 150 words.\n"
+            "• Be clear, practical, and direct.\n"
+            "• No filler or unnecessary disclaimers.\n"
+            "• Only include sections that are relevant to the question.\n\n"
+        
+            "POSSIBLE STRUCTURE (use adaptively):\n\n"
+        
+            "**Direct Answer**\n"
+            "Clear response in 1–2 sentences.\n\n"
+        
+            "**Action Steps** (if action is needed)\n"
+            "* 2–5 practical steps.\n\n"
+        
+            "**Risks / Considerations** (if relevant)\n"
+            "* Key legal or practical concerns.\n\n"
+        
+            "**Clarifying Questions** (only if essential)\n"
+            "* Short, focused questions.\n\n"
+        
             f"{history_block}"
-            f"User question:\n{query}\n\n"
-            "--- Retrieved context from the document ---\n"
+            f"User Question:\n{query}\n\n"
+        
+            "--- Relevant Context ---\n"
             f"{context}\n"
-            "-------------------------------------------\n\n"
-            "--- Safety slice of full document (fallback) ---\n"
-            f"{safety_slice}\n"
-            "------------------------------------------------\n\n"
-            "Now produce the response EXACTLY in the format above, within 150 words."
+            "------------------------\n\n"
+        
+            "Now generate the most appropriate structured response."
         )
 
         answer = self._generate(prompt)

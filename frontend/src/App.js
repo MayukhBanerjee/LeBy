@@ -405,7 +405,8 @@ export default function App() {
               Paste Content
             </Typography>
             <TextareaAutosize
-              minRows={4}
+              minRows={8}
+              maxRows={12}
               placeholder="Paste legal text here..."
               value={pastedText}
               onChange={(e) => setPastedText(e.target.value)}
@@ -413,6 +414,8 @@ export default function App() {
                 width: "100%",
                 marginTop: 8,
                 marginBottom: 16,
+                maxHeight: "300px",
+                overflowY: "auto",
                 resize: "none",
                 border: "1px solid #e2e8f0",
                 borderRadius: 12,

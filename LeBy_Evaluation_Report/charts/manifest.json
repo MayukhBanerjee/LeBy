@@ -1,0 +1,9 @@
+{
+  "accuracy_bar": "C:\\Users\\mayuk\\OneDrive\\Documents\\VIT Vellore\\5th Semester\\Machine Learning\\Project Try\\LeBy_Evaluation_Report\\charts\\01_accuracy_bar.png",
+  "radar": "C:\\Users\\mayuk\\OneDrive\\Documents\\VIT Vellore\\5th Semester\\Machine Learning\\Project Try\\LeBy_Evaluation_Report\\charts\\02_radar.png",
+  "latency_line": "C:\\Users\\mayuk\\OneDrive\\Documents\\VIT Vellore\\5th Semester\\Machine Learning\\Project Try\\LeBy_Evaluation_Report\\charts\\03_latency_line.png",
+  "error_donut": "C:\\Users\\mayuk\\OneDrive\\Documents\\VIT Vellore\\5th Semester\\Machine Learning\\Project Try\\LeBy_Evaluation_Report\\charts\\04_error_donut.png",
+  "ablation": "C:\\Users\\mayuk\\OneDrive\\Documents\\VIT Vellore\\5th Semester\\Machine Learning\\Project Try\\LeBy_Evaluation_Report\\charts\\05_ablation.png",
+  "metric_heatmap": "C:\\Users\\mayuk\\OneDrive\\Documents\\VIT Vellore\\5th Semester\\Machine Learning\\Project Try\\LeBy_Evaluation_Report\\charts\\06_metric_heatmap.png",
+  "latency_breakdown": "C:\\Users\\mayuk\\OneDrive\\Documents\\VIT Vellore\\5th Semester\\Machine Learning\\Project Try\\LeBy_Evaluation_Report\\charts\\07_latency_breakdown.png"
+}

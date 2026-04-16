@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import * as pdfjsLib from "pdfjs-dist";
+
 import {
   Container,
   Box,
@@ -27,7 +28,8 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import "./App.css";
 
 // Configure PDF.js worker via CDN matching installed version
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Replace .js with .mjs
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 // --- API BASE URL ---
 const API_BASE_URL =

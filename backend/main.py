@@ -41,8 +41,9 @@ sessions: Dict[str, Dict[str, Any]] = {}
 # Models
 # -------------------------------------------------
 class StartFromTextRequest(BaseModel):
-    text: str = Field(..., min_length=100, description="Raw text to analyze")
+    text: str = Field(..., min_length=10, description="Raw text to analyze")
     filename: str = Field(..., description="Display name for the source")
+    is_general: bool = Field(False, description="General chat mode, bypass RAG")
 
 
 class StartSessionResponse(BaseModel):
@@ -104,6 +105,17 @@ async def start_session_from_text(
 ):
     # create session skeleton
     session_id = str(uuid.uuid4())
+
+    if request.is_general:
+        doc_session = DocumentSession(full_text=request.text, session_id=session_id, is_general=True)
+        sessions[session_id] = {
+            "status": "READY",
+            "filename": request.filename,
+            "summary": None,
+            "session_object": doc_session,
+        }
+        return {"session_id": session_id, "filename": request.filename}
+
     sessions[session_id] = {
         "status": "PROCESSING",
         "filename": request.filename,

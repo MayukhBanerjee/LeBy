@@ -73,27 +73,47 @@ function Header({ onReset }) {
   return (
     <Box
       sx={{
-        p: 2,
-        borderBottom: "1px solid #e5e7eb",
-        bgcolor: "primary.main",
+        p: 3,
+        borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
+        background: "var(--primary-gradient)",
         color: "white",
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between"
+        justifyContent: "space-between",
+        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)"
       }}
     >
-      <Stack direction="row" spacing={1} alignItems="center">
-        <GavelIcon />
-        <Typography variant="h5" fontWeight="bold">
-          LeBy – Intelligent Legal Assistant
-        </Typography>
+      <Stack direction="row" spacing={2} alignItems="center">
+        <Box 
+          sx={{ 
+            bgcolor: "rgba(255, 255, 255, 0.2)", 
+            p: 1, 
+            borderRadius: 2, 
+            display: "flex", 
+            backdropFilter: "blur(4px)" 
+          }}
+        >
+          <GavelIcon sx={{ fontSize: 28 }} />
+        </Box>
+        <Box>
+          <Typography variant="h5" fontWeight="800" sx={{ letterSpacing: "-0.02em" }}>
+            LeBy AI
+          </Typography>
+          <Typography variant="caption" sx={{ opacity: 0.8, fontWeight: 500 }}>
+            INTELLIGENT LEGAL STRATEGIST
+          </Typography>
+        </Box>
       </Stack>
       {onReset && (
         <Button
           variant="contained"
-          color="secondary"
           onClick={onReset}
-          sx={{ textTransform: "none" }}
+          className="action-button"
+          sx={{ 
+            bgcolor: "white", 
+            color: "primary.main",
+            "&:hover": { bgcolor: "#f8fafc" }
+          }}
         >
           New Session
         </Button>
@@ -142,7 +162,7 @@ export default function App() {
     setNotification({ open: true, message, severity });
 
   // --- Poll backend until READY ---
-  const pollStatus = (sid, filename, silent = false) => {
+  const pollStatus = (sid, filename, silent = false, isGeneral = false) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
@@ -151,8 +171,9 @@ export default function App() {
           clearInterval(pollRef.current);
           setSessionReady(true);
 
-          if (silent && generalMode) {
+          if (isGeneral) {
             // General Help: keep the greeting visible; do NOT append auto-summary
+            // We just stop polling and mark as ready
           } else if (appState === "chat" && silent) {
             // Silent but not General Help: append a soft summary
             setMessages((m) => [
@@ -161,7 +182,7 @@ export default function App() {
                 sender: "ai",
                 text:
                   `✅ Context ready for **${filename}**.\n\n` +
-                  `--- Summary ---\n${data.summary}\n\n` +
+                  (data.summary ? `--- Summary ---\n${data.summary}\n\n` : "") +
                   `You can ask follow-ups like “What should I do next?” or “Who can help?”`
               }
             ]);
@@ -172,7 +193,7 @@ export default function App() {
                 sender: "ai",
                 text:
                   `✅ Analysis of "${filename}" complete!\n\n` +
-                  `--- Summary ---\n${data.summary}\n\n` +
+                  (data.summary ? `--- Summary ---\n${data.summary}\n\n` : "") +
                   `Now you can ask me questions like “What should I do next?”, “Who can help?”, or “Explain Section 4.”`
               }
             ]);
@@ -249,7 +270,7 @@ export default function App() {
         filename
       });
       setSessionId(data.session_id);
-      pollStatus(data.session_id, data.filename);
+      pollStatus(data.session_id, data.filename, false, false);
     } catch (err) {
       const msg =
         err?.response?.data?.detail ??
@@ -269,21 +290,24 @@ export default function App() {
       {
         sender: "ai",
         text:
-          "**General Legal Help**\n\n" +
-          "* Tell me what happened (who, what, where, when).\n" +
-          "* Share any notices, dates, amounts, or deadlines.\n" +
-          "* I’ll give immediate next steps, what to prepare, and who to contact."
+          "### ⚖️ General Legal Help Initialized\n\n" +
+          "I am ready to provide strategic guidance on your situation. To get the most accurate advice, please share:\n\n" +
+          "* **Context:** What happened, where, and when?\n" +
+          "* **Details:** Any specific notices, deadlines, or amounts involved?\n" +
+          "* **Goal:** What are you hoping to achieve or resolve?\n\n" +
+          "*Type your situation below to begin.*"
       }
     ]);
 
     try {
       const { data } = await axios.post(`${API_BASE_URL}/session/start-from-text`, {
         text: GENERIC_SESSION_TEXT,
-        filename: "General Legal Help"
+        filename: "General Legal Help",
+        is_general: true
       });
       setSessionId(data.session_id);
       // Poll silently; in general mode we do NOT append the summary
-      pollStatus(data.session_id, data.filename, /*silent*/ true);
+      pollStatus(data.session_id, data.filename, true, true);
     } catch (err) {
       const msg =
         err?.response?.data?.detail ??
@@ -322,30 +346,44 @@ export default function App() {
   const InputScreen = (
     <Box
       sx={{
-        p: 4,
+        p: 6,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: 3
+        gap: 4
       }}
     >
-      <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-        Start by providing a document or ask the assistant directly
-      </Typography>
+      <Box sx={{ textAlign: "center", mb: 2 }}>
+        <Typography variant="h4" fontWeight="800" gutterBottom sx={{ color: "#0f172a" }}>
+          How can I assist you today?
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600, mx: "auto" }}>
+          LeBy uses advanced AI to analyze legal documents and provide strategic guidance.
+          Choose an option below to get started.
+        </Typography>
+      </Box>
 
-      <Box sx={{ display: "flex", gap: 3, width: "100%", flexWrap: "wrap" }}>
+      <Box sx={{ display: "flex", gap: 3, width: "100%", flexWrap: "wrap", justifyContent: "center" }}>
         {/* Upload PDF */}
-        <Card sx={{ flex: 1, minWidth: 280, textAlign: "center" }}>
-          <CardContent>
-            <UploadFileIcon sx={{ fontSize: 44, color: "primary.main" }} />
-            <Typography sx={{ mt: 1.5, fontWeight: 600 }}>
-              Upload a PDF File
+        <Card className="input-card" sx={{ flex: 1, minWidth: 300, borderRadius: 4 }}>
+          <CardContent sx={{ p: 4 }}>
+            <Box sx={{ bgcolor: "blue.50", p: 2, borderRadius: 3, width: "fit-content", mb: 2 }}>
+              <UploadFileIcon sx={{ fontSize: 32, color: "primary.main" }} />
+            </Box>
+            <Typography variant="h6" fontWeight="700" gutterBottom>
+              Analyze Document
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Text is extracted locally in your browser, then analyzed securely.
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, height: 40 }}>
+              Upload a PDF for instant summarization and interactive Q&A.
             </Typography>
-            <Button variant="contained" component="label">
-              Choose PDF
+            <Button 
+              variant="contained" 
+              component="label" 
+              fullWidth 
+              className="action-button"
+              startIcon={<UploadFileIcon />}
+            >
+              Upload PDF
               <input
                 hidden
                 type="file"
@@ -358,61 +396,73 @@ export default function App() {
         </Card>
 
         {/* Paste Text */}
-        <Card sx={{ flex: 1, minWidth: 280 }}>
-          <CardContent sx={{ display: "flex", flexDirection: "column" }}>
-            <ArticleIcon
-              sx={{ fontSize: 44, color: "primary.main", alignSelf: "center" }}
-            />
-            <Typography sx={{ mt: 1.5, textAlign: "center", fontWeight: 600 }}>
-              Paste Document Text
+        <Card className="input-card" sx={{ flex: 1, minWidth: 300, borderRadius: 4 }}>
+          <CardContent sx={{ p: 4, display: "flex", flexDirection: "column" }}>
+            <Box sx={{ bgcolor: "indigo.50", p: 2, borderRadius: 3, width: "fit-content", mb: 2 }}>
+              <ArticleIcon sx={{ fontSize: 32, color: "indigo.600" }} />
+            </Box>
+            <Typography variant="h6" fontWeight="700" gutterBottom>
+              Paste Content
             </Typography>
             <TextareaAutosize
-              minRows={8}
-              placeholder="Paste your legal document text here..."
+              minRows={4}
+              placeholder="Paste legal text here..."
               value={pastedText}
               onChange={(e) => setPastedText(e.target.value)}
               style={{
                 width: "100%",
-                marginTop: 16,
-                flex: 1,
+                marginTop: 8,
+                marginBottom: 16,
                 resize: "none",
-                border: "1px solid #cbd5e1",
-                borderRadius: 8,
-                padding: 12,
-                background: "white"
+                border: "1px solid #e2e8f0",
+                borderRadius: 12,
+                padding: 16,
+                fontSize: "0.9rem",
+                outline: "none",
+                transition: "border-color 0.2s",
               }}
             />
             <Button
               variant="contained"
-              sx={{ mt: 2, alignSelf: "flex-end" }}
-              onClick={() => startSession(pastedText, "Pasted Text")}
+              fullWidth
+              className="action-button"
+              onClick={() => startSession(pastedText, "Pasted Content")}
               disabled={!pastedText.trim()}
+              sx={{ bgcolor: "indigo.600", "&:hover": { bgcolor: "indigo.700" } }}
             >
               Analyze Text
             </Button>
           </CardContent>
         </Card>
 
-        {/* NEW: General Legal Help */}
-        <Card sx={{ flex: 1, minWidth: 280, textAlign: "center" }}>
-          <CardContent>
-            <HelpOutlineIcon sx={{ fontSize: 44, color: "primary.main" }} />
-            <Typography sx={{ mt: 1.5, fontWeight: 600 }}>
-              General Legal Help
+        {/* General Legal Help */}
+        <Card className="input-card" sx={{ flex: 1, minWidth: 300, borderRadius: 4 }}>
+          <CardContent sx={{ p: 4 }}>
+            <Box sx={{ bgcolor: "slate.50", p: 2, borderRadius: 3, width: "fit-content", mb: 2 }}>
+              <HelpOutlineIcon sx={{ fontSize: 32, color: "slate.700" }} />
+            </Box>
+            <Typography variant="h6" fontWeight="700" gutterBottom>
+              Quick Advice
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              No document? Ask about incidents, accidents, police, tenancy, work disputes, etc.
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, height: 40 }}>
+              No document? Get strategic guidance on incidents or disputes.
             </Typography>
-            <Button variant="outlined" onClick={startGeneralSession}>
-              Start Chat
+            <Button 
+              variant="outlined" 
+              fullWidth 
+              className="action-button"
+              onClick={startGeneralSession}
+              sx={{ borderColor: "#cbd5e1", color: "#334155", "&:hover": { bgcolor: "#f1f5f9", borderColor: "#94a3b8" } }}
+            >
+              Start General Chat
             </Button>
           </CardContent>
         </Card>
       </Box>
 
-      <Stack direction="row" spacing={1}>
-        <Chip label="Summarizes first" color="primary" variant="outlined" />
-        <Chip label="Then you can chat with it" color="primary" variant="outlined" />
+      <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+        <Chip label="Private & Secure" size="small" variant="outlined" sx={{ color: "text.secondary" }} />
+        <Chip label="Gemini 2.0 Powered" size="small" variant="outlined" sx={{ color: "text.secondary" }} />
       </Stack>
     </Box>
   );
@@ -454,14 +504,12 @@ export default function App() {
             }}
           >
             <Paper
-              elevation={1}
+              elevation={0}
+              className={m.sender === "user" ? "message-user" : "message-ai"}
               sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: m.sender === "user" ? "primary.main" : "white",
-                color: m.sender === "user" ? "white" : "black",
+                p: 2,
                 maxWidth: "80%",
-                fontSize: "0.96rem",
+                fontSize: "0.95rem",
                 lineHeight: 1.6,
                 wordBreak: "break-word",
                 whiteSpace: "normal"
@@ -469,7 +517,7 @@ export default function App() {
             >
               {m.sender === "ai" ? (
                 <div
-                  style={{ textAlign: "left", marginLeft: "4px" }}
+                  style={{ textAlign: "left" }}
                   dangerouslySetInnerHTML={{ __html: formatAiTextToHtml(m.text) }}
                 />
               ) : (
@@ -514,13 +562,15 @@ export default function App() {
   return (
     <Container maxWidth="lg" sx={{ my: 3, height: "94vh" }}>
       <Paper
-        elevation={4}
+        elevation={0}
+        className="premium-paper"
         sx={{
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          borderRadius: 3,
-          overflow: "hidden"
+          borderRadius: 6,
+          overflow: "hidden",
+          border: "1px solid rgba(255, 255, 255, 0.4)"
         }}
       >
         <Header

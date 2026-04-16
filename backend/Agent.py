@@ -100,11 +100,13 @@ class DocumentSession:
     and intelligent question answering using Gemini SDK.
     """
 
-    def __init__(self, full_text: str, session_id: str | None = None):
+    def __init__(self, full_text: str, session_id: str | None = None, is_general: bool = False):
         self.session_id = session_id or str(uuid.uuid4())
         self.full_text = full_text
+        self.is_general = is_general
         self.vector_store_path = os.path.join(VECTOR_STORE_DIR, self.session_id)
-        self._prepare_vector_store()
+        if not self.is_general:
+            self._prepare_vector_store()
         self.history: List[Dict[str, str]] = []
 
     # ------------------------------------------------------------
@@ -148,18 +150,17 @@ class DocumentSession:
         Keep it short (≤ 250 words), factual, and well structured.
         """
         prompt = (
-            "You are an expert legal summarizer. "
-            "Summarize the document concisely and professionally in markdown.\n\n"
-            "Guidelines:\n"
-            "- Length: under 250 words total.\n"
-            "- Structure: Purpose, Key Parties, Key Clauses/Obligations, Important Dates, and Notable Points.\n"
-            "- Use short phrases or single-sentence bullets.\n"
-            "- Avoid repetition and filler words.\n"
-            "- Use clear section headers with **bold** labels (no *asterisks*).\n\n"
-            "Document text:\n"
-            f"{self.full_text[:8000]}\n\n"
-            "Now output the summary directly in markdown without preamble or closing lines."
+            "You are a Senior Legal Document Specialist.\n"
+            "Generate a high-level executive summary of the provided text.\n\n"
+            "REQUIREMENTS:\n"
+            "- Tone: Formal, objective, and precise.\n"
+            "- Format: Use professional markdown with semantic headers.\n"
+            "- Sections: Executive Overview, Key Parties, Significant Obligations, Critical Deadlines, and Potential Red Flags.\n\n"
+            "Document Text Segment:\n"
+            f"{self.full_text[:12000]}\n\n"
+            "Deliver the summary directly without any introductory conversational text."
         )
+        
         return self._generate(prompt)
 
     # ------------------------------------------------------------
@@ -174,13 +175,16 @@ class DocumentSession:
         - Keep it concise and direct.
         """
         # Retrieve top chunks for grounding
-        db = _load_faiss(self.vector_store_path)
-        retriever = db.as_retriever(search_kwargs={"k": 6})
-        docs = retriever.get_relevant_documents(query or "next steps action plan")
-        context = "\n\n".join(d.page_content for d in docs)
+        if self.is_general:
+            context = "General Legal Help - No specific document context provided. You are to act as a general legal assistant advising on common legal issues based on your instructions. Note: This is an ungrounded chat about the user's generic problem."
+        else:
+            db = _load_faiss(self.vector_store_path)
+            retriever = db.as_retriever(search_kwargs={"k": 6})
+            docs = retriever.get_relevant_documents(query or "next steps action plan")
+            context = "\n\n".join(d.page_content for d in docs)
 
         # Safety net: include a small slice of the full text to avoid “no context” answers
-        safety_slice = self.full_text[:2000]
+        safety_slice = self.full_text[:2000] if not self.is_general else ""
 
         # Light conversation memory
         history_block = ""
@@ -188,43 +192,44 @@ class DocumentSession:
             pairs = [f"User: {h['user']}\nAssistant: {h['assistant']}" for h in self.history[-5:]]
             history_block = "Recent conversation:\n" + "\n\n".join(pairs) + "\n\n"
 
+        # Determine context constraints based on mode
+        if self.is_general:
+            persona = (
+                "You are an elite legal strategist. You are providing general guidance without a specific document.\n"
+                "FOCUS: Practical first steps, risk mitigation, and identifying which specialist (e.g., criminal lawyer, employment tribunal) is needed."
+            )
+            context_guidance = (
+                "Since no document is uploaded, provide high-level strategic advice based on general legal principles. "
+                "Structure your response with clear, actionable bullet points."
+            )
+        else:
+            persona = (
+                "You are an elite legal analyst. Use the provided document as your sole source of truth."
+            )
+            context_guidance = (
+                "Always ground your answer in the provided document context. If the document is silent, "
+                "state so clearly and then provide best-practice guidance as a secondary measure."
+            )
+
         # Concise, structured prompt
         prompt = (
-              "You are a smart and practical legal assistant.\n\n"
-
-            "Always use the provided document context to answer the user's question.\n"
-            "If the question is broad (e.g., 'What should I do next?'), provide a clear action plan.\n"
-            "If the question is specific, answer directly and only add sections if helpful.\n\n"
-        
-            "RESPONSE GUIDELINES:\n"
-            "• Keep responses under 150 words.\n"
-            "• Be clear, practical, and direct.\n"
-            "• No filler or unnecessary disclaimers.\n"
-            "• Only include sections that are relevant to the question.\n\n"
-        
-            "POSSIBLE STRUCTURE (use adaptively):\n\n"
-        
-            "**Direct Answer**\n"
-            "Clear response in 1 to 2 sentences.\n\n"
-        
-            "**Action Steps** (if action is needed)\n"
-            "* 2 to 5 practical steps.\n\n"
-        
-            "**Risks / Considerations** (if relevant)\n"
-            "* Key legal or practical concerns.\n\n"
-        
-            "**Clarifying Questions** (only if essential)\n"
-            "* Short, focused questions.\n\n"
-        
+            f"{persona}\n\n"
+            f"{context_guidance}\n\n"
+            "RESPONSE STYLE:\n"
+            "- Tone: Authoritative, professional, but accessible.\n"
+            "- Structure: Primary Answer -> Action Steps -> Strategic Considerations.\n"
+            "- Conciseness: Maximum 200 words.\n\n"
+            
             f"{history_block}"
-            f"User Question:\n{query}\n\n"
+            f"User Question: {query}\n\n"
         
-            "--- Relevant Context ---\n"
+            "--- Context / Strategic Instructions ---\n"
             f"{context}\n"
-            "------------------------\n\n"
+            "------------------------------------------\n\n"
         
-            "Now generate the most appropriate structured response."
+            "Now deliver your final guidance in professional markdown."
         )
+        
 
         answer = self._generate(prompt)
 
